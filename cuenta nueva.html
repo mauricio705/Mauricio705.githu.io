@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gestión de Clientes</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #eaeaea;
+      padding: 10px;
+      margin: 0;
+    }
+    h2 {
+      color: #333;
+      text-align: center;
+      text-shadow: 1px 1px 0 #ccc;
+    }
+    .seccion { display: none; }
+    .visible { display: block; }
+    .formulario, .tabla-container, .historial-container {
+      background: #fff;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: inset 0 0 5px rgba(0,0,0,0.1), 0 2px 6px rgba(0,0,0,0.2);
+    }
+    input[type="text"], input[type="number"] {
+      padding: 12px;
+      width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin: 10px 0;
+      font-size: 16px;
+      box-shadow: inset 1px 1px 3px #ddd;
+    }
+    button {
+      padding: 12px;
+      width: 100%;
+      border: none;
+      border-radius: 6px;
+      background-color: royalblue;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    button:hover { background-color: darkblue; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: inset 0 0 4px rgba(0,0,0,0.05);
+    }
+    th, td {
+      padding: 12px;
+      text-align: center;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+      text-shadow: 0 1px 0 #f5f5f5;
+    }
+    th { background-color: royalblue; color: white; }
+    .saldo { background-color: #ffe082; }
+    .abono input {
+      width: 60px;
+      padding: 5px;
+      font-size: 14px;
+      box-shadow: inset 1px 1px 3px #ddd;
+    }
+    .historial {
+      white-space: pre-wrap;
+      text-align: left;
+      padding: 10px;
+      background: #f9f9f9;
+      border-left: 4px solid royalblue;
+      margin: 10px 0;
+      border-radius: 6px;
+      font-size: 14px;
+      box-shadow: inset 1px 1px 4px rgba(0,0,0,0.05);
+    }
+    .porcentaje-input {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .porcentaje-input input {
+      width: 80px;
+      text-align: center;
+    }
+    #total-abonos {
+      font-size: 18px;
+      font-weight: bold;
+      text-align: center;
+      margin: 10px 0;
+    }
+    label { font-size: 14px; display: block; margin: 10px 0; }
+  </style>
+</head>
+<body>
+
+  <div id="pantalla-lista" class="seccion visible">
+    <h2>Clientes</h2>
+    <div id="mensaje-dia" style="text-align:center; margin-bottom: 10px; font-weight: bold;"></div>
+    <div id="total-abonos">Total Abonos del Día: $0</div>
+    <button onclick="verHistorialAbonos()">📅 Ver Historial de Abonos</button>
+    <button onclick="mostrarFormulario()">➕ Agregar Cliente</button>
+    <label><input type="checkbox" id="mostrarCero" onchange="renderTabla()" /> Mostrar clientes con saldo 0</label>
+    <div class="tabla-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Saldo</th>
+            <th>Cliente</th>
+            <th>Abono</th>
+            <th>Válor</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-cuerpo"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="pantalla-formulario" class="seccion">
+    <h2>Agregar Cliente</h2>
+    <form id="formulario" class="formulario">
+      <input type="text" id="cliente" placeholder="Nombre del Cliente" required />
+      <input type="text" id="direccion" placeholder="Dirección" required />
+      <input type="number" id="saldo" placeholder="Saldo" required />
+      <div class="porcentaje-input">
+        <input type="number" id="porcentaje" value="10" min="0" max="100" />
+        <button type="button" onclick="sumarPorcentaje()">➕ % al Saldo</button>
+      </div>
+      <input type="number" id="balor" placeholder="Válor (opcional)" />
+      <button type="button" onclick="asignarBalor()">➕ Asignar Válor</button>
+      <button type="submit">Guardar Cliente</button>
+    </form>
+    <button onclick="volverLista()">🔙 Volver</button>
+  </div>
+
+  <div id="pantalla-historial" class="seccion">
+    <h2>Historial</h2>
+    <div id="historial-box" class="historial-container"></div>
+    <button onclick="volverLista()">🔙 Volver</button>
+  </div>
+
+  <div id="pantalla-abonos-historial" class="seccion">
+    <h2>Historial de Abonos</h2>
+    <div id="historial-abonos" class="historial-container"></div>
+    <button onclick="exportarHistorialAbonos()">📄 Exportar Historial</button>
+    <button onclick="window.print()">🖨️ Imprimir</button>
+    <button onclick="volverLista()">🔙 Volver</button>
+  </div>
+
+  <script>
+    let datos = [];
+    let totalAbonos = parseFloat(localStorage.getItem("totalAbonos")) || 0;
+    let historialAbonos = JSON.parse(localStorage.getItem("historialAbonos")) || [];
+
+    const cargarDatos = () => {
+      const guardado = localStorage.getItem("clientes");
+      return guardado ? JSON.parse(guardado) : [];
+    };
+
+    const guardarDatos = () => {
+      localStorage.setItem("clientes", JSON.stringify(datos));
+    };
+
+    const actualizarTotalAbonos = () => {
+      document.getElementById("total-abonos").innerText = `Total Abonos del Día: $${totalAbonos.toLocaleString('es-ES')}`;
+      localStorage.setItem("totalAbonos", totalAbonos);
+    };
+
+    const mostrarSeccion = (id) => {
+      document.querySelectorAll('.seccion').forEach(sec => sec.classList.remove('visible'));
+      document.getElementById(id).classList.add('visible');
+    };
+
+    const mostrarFormulario = () => mostrarSeccion('pantalla-formulario');
+    const volverLista = () => mostrarSeccion('pantalla-lista');
+
+    const asignarBalor = () => {
+      document.getElementById("balor").value = 100;
+    };
+
+    const renderTabla = () => {
+      const cuerpo = document.getElementById("tabla-cuerpo");
+      const mostrarCero = document.getElementById("mostrarCero").checked;
+      const hoy = new Date().toLocaleDateString();
+      const mensaje = document.getElementById("mensaje-dia");
+
+      cuerpo.innerHTML = "";
+      mensaje.innerText = `📅 Mostrando clientes del día: ${hoy}`;
+
+      datos.forEach((fila, index) => {
+        if (fila.fechaCreacion !== hoy) return;
+        if (!mostrarCero && fila.saldo <= 0) return;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="saldo">$ ${fila.saldo.toLocaleString('es-ES')}</td>
+          <td>${fila.cliente}</td>
+          <td class="abono">
+            <input type="number" id="abono-${index}" value="0" />
+          </td>
+          <td>$ ${fila.balor?.toLocaleString('es-ES') || 0}</td>
+          <td>
+            <button onclick="guardarAbono(${index})">Guardar</button>
+            <button onclick="verHistorial(${index})">🕘</button>
+          </td>
+        `;
+        cuerpo.appendChild(tr);
+      });
+
+      guardarDatos();
+    };
+
+    const guardarAbono = (i) => {
+      const input = document.getElementById(`abono-${i}`);
+      const abono = parseFloat(input.value);
+      if (!isNaN(abono) && abono > 0) {
+        const cliente = datos[i];
+        cliente.saldo -= abono;
+        const fecha = new Date();
+        const registro = `💰 Abono: $${abono} | ${fecha.toLocaleString()} | Saldo restante: $${cliente.saldo}`;
+        cliente.historial.push(registro);
+        totalAbonos += abono;
+        actualizarTotalAbonos();
+        guardarDatos();
+        renderTabla();
+      }
+    };
+
+    const verHistorial = (i) => {
+      const cliente = datos[i];
+      const historialTexto = cliente.historial.length > 0
+        ? cliente.historial.join('\n')
+        : "Sin pagos registrados.";
+      const div = document.getElementById("historial-box");
+      div.innerHTML = `<div class="historial"><strong>${cliente.cliente}</strong><br><em>Dirección: ${cliente.direccion}</em><br><br>${historialTexto}</div>`;
+      mostrarSeccion("pantalla-historial");
+    };
+
+    const sumarPorcentaje = () => {
+      const saldoInput = document.getElementById("saldo");
+      const porcentajeInput = document.getElementById("porcentaje");
+      let saldo = parseFloat(saldoInput.value);
+      let porcentaje = parseFloat(porcentajeInput.value);
+      if (!isNaN(saldo) && !isNaN(porcentaje) && saldo > 0 && porcentaje >= 0) {
+        saldo = saldo * (1 + porcentaje / 100);
+        saldoInput.value = saldo.toFixed(2);
+      }
+    };
+
+    const verHistorialAbonos = () => {
+      const cont = document.getElementById("historial-abonos");
+      if (historialAbonos.length === 0) {
+        cont.innerHTML = "<div class='historial'>Sin historial de abonos aún.</div>";
+      } else {
+        cont.innerHTML = historialAbonos.map(item =>
+          `<div class="historial">📅 ${item.fecha}: $${item.total.toLocaleString('es-ES')}</div>`
+        ).join('');
+      }
+      mostrarSeccion("pantalla-abonos-historial");
+    };
+
+    const exportarHistorialAbonos = () => {
+      if (historialAbonos.length === 0) {
+        alert("No hay historial para exportar.");
+        return;
+      }
+
+      let texto = historialAbonos.map((h, i) => {
+        return `📅 ${h.fecha}\nTotal: $${h.total.toLocaleString('es-ES')}\n`;
+      }).join('\n');
+
+      const blob = new Blob([texto], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'historial_abonos.txt';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    };
+
+    const revisarResetDiario = () => {
+      const ahora = new Date();
+      const hoy = new Date().toLocaleDateString();
+      const ultimaFecha = localStorage.getItem("ultimaReset");
+      const hora = ahora.getHours();
+
+      if (ultimaFecha !== hoy && hora >= 2) {
+        if (totalAbonos > 0) {
+          historialAbonos.push({
+            fecha: ahora.toLocaleString(),
+            total: totalAbonos
+          });
+          localStorage.setItem("historialAbonos", JSON.stringify(historialAbonos));
+        }
+        totalAbonos = 0;
+        actualizarTotalAbonos();
+        localStorage.setItem("ultimaReset", hoy);
+      }
+    };
+
+    document.getElementById("formulario").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const cliente = document.getElementById("cliente").value.trim();
+      const direccion = document.getElementById("direccion").value.trim();
+      const saldo = parseFloat(document.getElementById("saldo").value);
+      const balor = parseFloat(document.getElementById("balor").value);
+      if (cliente && direccion && saldo > 0) {
+        datos.push({
+          id: Date.now(),
+          cliente,
+          direccion,
+          saldo,
+          balor: balor || 0,
+          historial: [],
+          fechaCreacion: new Date().toLocaleDateString()
+        });
+        guardarDatos();
+        renderTabla();
+        e.target.reset();
+        volverLista();
+      }
+    });
+
+    datos = cargarDatos();
+    revisarResetDiario();
+    actualizarTotalAbonos();
+    renderTabla();
+  </script>
+
+</body>
+</html>
